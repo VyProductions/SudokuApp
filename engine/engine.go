@@ -3,7 +3,6 @@ package engine
 import (
 	"errors"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/veandco/go-sdl2/sdl"
@@ -175,160 +174,31 @@ func (e *Engine) Setup(wind *sdl.Window, rend *sdl.Renderer) error {
 	// Setup application scenes
 	e.Scenes = map[string]Scene{}
 
-	windWidth, _ := e.Window.GetSize()
-
-	titleFont := "lotuscoder_bold"
-	titleSize := 36
-
-	buttonFont := "lotuscoder_normal"
-	buttonFontSize := 24
-
 	// Add menu scene to engine
 	menu := &Menu{}
 
 	menu.Setup(e, "Main Menu", nil)
 
-	e.CurrentScene = menu
-	*menu.Active() = true
-
-	// Add title to menu scene
-	titleLabel := &Label{}
-	titleText := []string{"Vy's Sudoku"}
-
-	err := titleLabel.Setup(e, []interface{}{
-		sdl.Point{X: 0, Y: 0},
-		sdl.Point{X: windWidth, Y: 40},
-		sdl.Color{R: 0x00, G: 0x00, B: 0x00, A: 0xFF},
-		titleText,
-		sdl.Color{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF},
-		titleFont, titleSize,
-	})
-
-	if err != nil {
-		return err
-	}
-
-	// Add button to menu scene
-	startButton := &Button{}
-	startText := "Start Game"
-
-	err = startButton.Setup(e, []interface{}{
-		sdl.Point{X: 325, Y: 284},
-		sdl.Point{X: 150, Y: 32},
-		sdl.Color{R: 0xAF, G: 0xAF, B: 0xAF, A: 0xFF},
-		startText,
-		sdl.Color{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF},
-		buttonFont, buttonFontSize,
-		func(e *Engine) {
-			startButton.BackgroundColor = sdl.Color{
-				R: uint8(min(uint16(0xCF), uint16(startButton.BackgroundColor.R)+uint16(0x66))),
-				G: uint8(min(uint16(0xCF), uint16(startButton.BackgroundColor.G)+uint16(0x66))),
-				B: uint8(min(uint16(0xCF), uint16(startButton.BackgroundColor.B)+uint16(0x66))),
-				A: startButton.BackgroundColor.A,
-			}
-		},
-		func(e *Engine) {
-			startButton.BackgroundColor = startButton.InitBackgroundColor
-		},
-		func(e *Engine) {
-			err := menu.Switch(e, "Game")
-
-			if err != nil {
-				log.Fatalf("Error during click for widget %s: %s\n", startButton.GetWidgetID(), err)
-			}
-
-			startButton.BackgroundColor = startButton.InitBackgroundColor
-		},
-	})
+	err := menu.MainMenu(e)
 
 	if err != nil {
 		return err
 	}
 
 	// Add game scene to engine
-	game := &Menu{}
+	game := &Game{}
 
 	game.Setup(e, "Game", nil)
 
-	e.CurrentScene.Switch(e, "Game")
-
-	// Add 9x9 grid of buttons to game scene
-	cellSize := int32(50)
-
-	for row := 0; row < 9; row++ {
-		for col := 0; col < 9; col++ {
-			button := &Button{}
-
-			x_offs := int32(col)*(cellSize+10) + int32(col/3)*5
-			y_offs := int32(row)*(cellSize+10) + int32(row/3)*5
-
-			err = button.Setup(e, []interface{}{
-				sdl.Point{X: 10 + x_offs, Y: 10 + y_offs},
-				sdl.Point{X: cellSize, Y: cellSize},
-				sdl.Color{R: 0xAF, G: 0xAF, B: 0xAF, A: 0xFF},
-				"",
-				sdl.Color{R: 0x03, G: 0x07, B: 0x16, A: 0xFF},
-				buttonFont, buttonFontSize,
-				func(e *Engine) {
-					button.BackgroundColor = sdl.Color{
-						R: uint8(min(uint16(0xCF), uint16(button.BackgroundColor.R)+uint16(0x66))),
-						G: uint8(min(uint16(0xCF), uint16(button.BackgroundColor.G)+uint16(0x66))),
-						B: uint8(min(uint16(0xCF), uint16(button.BackgroundColor.B)+uint16(0x66))),
-						A: button.BackgroundColor.A,
-					}
-				},
-				func(e *Engine) {
-					button.BackgroundColor = button.InitBackgroundColor
-				},
-				func(e *Engine) {
-					fmt.Printf("Clicked %s -> (%d, %d)\n", button.GetWidgetID(), row, col)
-				},
-			})
-
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	// Add back button to game scene
-	back := &Button{}
-
-	err = back.Setup(e, []interface{}{
-		sdl.Point{X: 9*cellSize + 11*10, Y: 8*cellSize + 10*10},
-		sdl.Point{X: 2*cellSize + 10, Y: cellSize},
-		sdl.Color{R: 0xDF, G: 0x10, B: 0x10, A: 0xFF},
-		"Back",
-		sdl.Color{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF},
-		buttonFont, buttonFontSize,
-		func(e *Engine) {
-			back.BackgroundColor = sdl.Color{
-				R: uint8(min(uint16(0xCF), uint16(back.BackgroundColor.R)+uint16(0x66))),
-				G: uint8(min(uint16(0xCF), uint16(back.BackgroundColor.G)+uint16(0x66))),
-				B: uint8(min(uint16(0xCF), uint16(back.BackgroundColor.B)+uint16(0x66))),
-				A: back.BackgroundColor.A,
-			}
-		},
-		func(e *Engine) {
-			back.BackgroundColor = back.InitBackgroundColor
-		},
-		func(e *Engine) {
-			err := game.Switch(e, "Main Menu")
-
-			if err != nil {
-				log.Fatalf("Error during click for widget %s: %s\n", back.GetWidgetID(), err)
-			}
-
-			back.BackgroundColor = back.InitBackgroundColor
-		},
-	})
+	err = game.NewGame()
 
 	if err != nil {
-		return nil
+		return err
 	}
 
 	// Set and activate menu as starting scene
-	e.CurrentScene.Switch(e, "Main Menu")
+	e.CurrentScene = menu
+	*menu.Active() = true
 
 	e.LastFrame = time.Now()
 
@@ -477,6 +347,21 @@ func (e *Engine) InsertScene(scene Scene) error {
 	}
 
 	e.Scenes[scene.GetTitle()] = scene
+	return nil
+}
+
+func (e *Engine) Switch(title string) error {
+	if e.CurrentScene.GetTitle() != title && e.ContainsScene(title) {
+		*e.CurrentScene.Active() = false
+		e.CurrentScene = e.Scenes[title]
+		*e.CurrentScene.Active() = true
+		e.CurrentScene.Hover(e, e.MousePos)
+	} else if e.CurrentScene.GetTitle() == title {
+		return fmt.Errorf("scene with title %s already current", title)
+	} else {
+		return fmt.Errorf("no scene exists with title: %s", title)
+	}
+
 	return nil
 }
 

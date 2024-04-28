@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -9,18 +10,35 @@ import (
 	"github.com/veandco/go-sdl2/ttf"
 )
 
+var (
+	DEFAULT_DRAW = sdl.Color{R: 0x00, G: 0x00, B: 0x00, A: 0x00}
+)
+
 type Engine struct {
-	Window         *sdl.Window
-	Renderer       *sdl.Renderer
-	Fonts          map[int]map[string]*ttf.Font
-	MousePos       sdl.Point
+	Window   *sdl.Window
+	Renderer *sdl.Renderer
+	Fonts    map[int]map[string]*ttf.Font
+
 	InputTransform map[int]byte
 	KeyBinds       map[byte][2]func(engine *Engine, args []interface{})
-	FrameTime      float64
-	LastFrame      time.Time
+
+	Scenes       map[string]Scene
+	CurrentScene Scene
+
+	MousePos  sdl.Point
+	MouseDown sdl.Point
+	MouseUp   sdl.Point
+
+	FrameTime float64
+	LastFrame time.Time
 }
 
-func (e *Engine) Setup() {
+func (e *Engine) Setup(wind *sdl.Window, rend *sdl.Renderer) error {
+	*e = Engine{
+		Window:   wind,
+		Renderer: rend,
+	}
+
 	// Initialize fonts for some variety of sizes
 	font_sizes := []int{14, 18, 24, 36, 48, 72, 96, 108, 120}
 
@@ -50,7 +68,7 @@ func (e *Engine) Setup() {
 
 		for _, err := range err_list {
 			if err != nil {
-				log.Fatalf("Failed to load font. %s\n", err)
+				return err
 			}
 		}
 
@@ -89,25 +107,34 @@ func (e *Engine) Setup() {
 	e.InputTransform[int(sdl.BUTTON_MIDDLE)] = MIDDLE_CLICK
 
 	e.KeyBinds[LEFT_CLICK] = [2]func(*Engine, []interface{}){
-		func(engine *Engine, args []interface{}) {
+		func(e *Engine, args []interface{}) {
 			x_pos, _ := args[0].(int32)
 			y_pos, _ := args[1].(int32)
-			fmt.Printf("Left Click Pressed @ (%d, %d)\n", x_pos, y_pos)
+
+			e.MouseDown = sdl.Point{X: x_pos, Y: y_pos}
 		},
-		func(engine *Engine, args []interface{}) {
+		func(e *Engine, args []interface{}) {
 			x_pos, _ := args[0].(int32)
 			y_pos, _ := args[1].(int32)
-			fmt.Printf("Left Click Released @ (%d, %d)\n", x_pos, y_pos)
+
+			e.MouseUp = sdl.Point{X: x_pos, Y: y_pos}
+
+			if e.MouseDown == e.MouseUp {
+				fmt.Printf("Clicked @ (%d, %d)\n", x_pos, y_pos)
+				e.CurrentScene.Click(e, e.MouseUp)
+			} else {
+				fmt.Printf("Dragged from (%d, %d) to (%d, %d)\n", e.MouseDown.X, e.MouseDown.Y, x_pos, y_pos)
+			}
 		},
 	}
 
 	e.KeyBinds[RIGHT_CLICK] = [2]func(*Engine, []interface{}){
-		func(engine *Engine, args []interface{}) {
+		func(e *Engine, args []interface{}) {
 			x_pos, _ := args[0].(int32)
 			y_pos, _ := args[1].(int32)
 			fmt.Printf("Right Click Pressed @ (%d, %d)\n", x_pos, y_pos)
 		},
-		func(engine *Engine, args []interface{}) {
+		func(e *Engine, args []interface{}) {
 			x_pos, _ := args[0].(int32)
 			y_pos, _ := args[1].(int32)
 			fmt.Printf("Right Click Released @ (%d, %d)\n", x_pos, y_pos)
@@ -115,12 +142,12 @@ func (e *Engine) Setup() {
 	}
 
 	e.KeyBinds[MIDDLE_CLICK] = [2]func(*Engine, []interface{}){
-		func(engine *Engine, args []interface{}) {
+		func(e *Engine, args []interface{}) {
 			x_pos, _ := args[0].(int32)
 			y_pos, _ := args[1].(int32)
 			fmt.Printf("Middle Click Pressed @ (%d, %d)\n", x_pos, y_pos)
 		},
-		func(engine *Engine, args []interface{}) {
+		func(e *Engine, args []interface{}) {
 			x_pos, _ := args[0].(int32)
 			y_pos, _ := args[1].(int32)
 			fmt.Printf("Middle Click Released @ (%d, %d)\n", x_pos, y_pos)
@@ -128,24 +155,181 @@ func (e *Engine) Setup() {
 	}
 
 	e.KeyBinds[VERT_SCROLL] = [2]func(*Engine, []interface{}){
-		func(engine *Engine, args []interface{}) {
+		func(e *Engine, args []interface{}) {
 			fmt.Println("Scroll Up.")
 		},
-		func(engine *Engine, args []interface{}) {
+		func(e *Engine, args []interface{}) {
 			fmt.Println("Scroll Down.")
 		},
 	}
 
 	e.KeyBinds[HORIZ_SCROLL] = [2]func(*Engine, []interface{}){
-		func(engine *Engine, args []interface{}) {
+		func(e *Engine, args []interface{}) {
 			fmt.Println("Scroll Right.")
 		},
-		func(engine *Engine, args []interface{}) {
+		func(e *Engine, args []interface{}) {
 			fmt.Println("Scroll Left.")
 		},
 	}
 
+	// Setup application scenes
+	e.Scenes = map[string]Scene{}
+
+	windWidth, _ := e.Window.GetSize()
+
+	titleFont := "lotuscoder_bold"
+	titleSize := 36
+
+	buttonFont := "lotuscoder_normal"
+	buttonFontSize := 24
+
+	// Add menu scene to engine
+	menu := &Menu{}
+
+	menu.Setup(e, "Main Menu", nil)
+
+	e.CurrentScene = menu
+	*menu.Active() = true
+
+	// Add title to menu scene
+	titleLabel := &Label{}
+	titleText := []string{"Vy's Sudoku"}
+
+	err := titleLabel.Setup(e, []interface{}{
+		sdl.Point{X: 0, Y: 0},
+		sdl.Point{X: windWidth, Y: 40},
+		sdl.Color{R: 0x00, G: 0x00, B: 0x00, A: 0xFF},
+		titleText,
+		sdl.Color{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF},
+		titleFont, titleSize,
+	})
+
+	if err != nil {
+		return err
+	}
+
+	// Add button to menu scene
+	startButton := &Button{}
+	startText := "Start Game"
+
+	err = startButton.Setup(e, []interface{}{
+		sdl.Point{X: 325, Y: 284},
+		sdl.Point{X: 150, Y: 32},
+		sdl.Color{R: 0xAF, G: 0xAF, B: 0xAF, A: 0xFF},
+		startText,
+		sdl.Color{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF},
+		buttonFont, buttonFontSize,
+		func(e *Engine) {
+			startButton.BackgroundColor = sdl.Color{
+				R: uint8(min(uint16(0xCF), uint16(startButton.BackgroundColor.R)+uint16(0x66))),
+				G: uint8(min(uint16(0xCF), uint16(startButton.BackgroundColor.G)+uint16(0x66))),
+				B: uint8(min(uint16(0xCF), uint16(startButton.BackgroundColor.B)+uint16(0x66))),
+				A: startButton.BackgroundColor.A,
+			}
+		},
+		func(e *Engine) {
+			startButton.BackgroundColor = startButton.InitBackgroundColor
+		},
+		func(e *Engine) {
+			err := menu.Switch(e, "Game")
+
+			if err != nil {
+				log.Fatalf("Error during click for widget %s: %s\n", startButton.GetWidgetID(), err)
+			}
+
+			startButton.BackgroundColor = startButton.InitBackgroundColor
+		},
+	})
+
+	if err != nil {
+		return err
+	}
+
+	// Add game scene to engine
+	game := &Menu{}
+
+	game.Setup(e, "Game", nil)
+
+	e.CurrentScene.Switch(e, "Game")
+
+	// Add 9x9 grid of buttons to game scene
+	cellSize := int32(50)
+
+	for row := 0; row < 9; row++ {
+		for col := 0; col < 9; col++ {
+			button := &Button{}
+
+			err = button.Setup(e, []interface{}{
+				sdl.Point{X: 10 + int32(col)*(cellSize+10), Y: 10 + int32(row)*(cellSize+10)},
+				sdl.Point{X: cellSize, Y: cellSize},
+				sdl.Color{R: 0xAF, G: 0xAF, B: 0xAF, A: 0xFF},
+				"",
+				sdl.Color{R: 0x03, G: 0x07, B: 0x16, A: 0xFF},
+				buttonFont, buttonFontSize,
+				func(e *Engine) {
+					button.BackgroundColor = sdl.Color{
+						R: uint8(min(uint16(0xCF), uint16(button.BackgroundColor.R)+uint16(0x66))),
+						G: uint8(min(uint16(0xCF), uint16(button.BackgroundColor.G)+uint16(0x66))),
+						B: uint8(min(uint16(0xCF), uint16(button.BackgroundColor.B)+uint16(0x66))),
+						A: button.BackgroundColor.A,
+					}
+				},
+				func(e *Engine) {
+					button.BackgroundColor = button.InitBackgroundColor
+				},
+				func(e *Engine) {
+					fmt.Printf("Clicked %s -> (%d, %d)\n", button.GetWidgetID(), row, col)
+				},
+			})
+
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	// Add back button to game scene
+	back := &Button{}
+
+	err = back.Setup(e, []interface{}{
+		sdl.Point{X: 9*cellSize + 10*10, Y: 8*cellSize + 9*10},
+		sdl.Point{X: 2*cellSize + 10, Y: cellSize},
+		sdl.Color{R: 0xDF, G: 0x10, B: 0x10, A: 0xFF},
+		"Back",
+		sdl.Color{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF},
+		buttonFont, buttonFontSize,
+		func(e *Engine) {
+			back.BackgroundColor = sdl.Color{
+				R: uint8(min(uint16(0xCF), uint16(back.BackgroundColor.R)+uint16(0x66))),
+				G: uint8(min(uint16(0xCF), uint16(back.BackgroundColor.G)+uint16(0x66))),
+				B: uint8(min(uint16(0xCF), uint16(back.BackgroundColor.B)+uint16(0x66))),
+				A: back.BackgroundColor.A,
+			}
+		},
+		func(e *Engine) {
+			back.BackgroundColor = back.InitBackgroundColor
+		},
+		func(e *Engine) {
+			err := game.Switch(e, "Main Menu")
+
+			if err != nil {
+				log.Fatalf("Error during click for widget %s: %s\n", back.GetWidgetID(), err)
+			}
+
+			back.BackgroundColor = back.InitBackgroundColor
+		},
+	})
+
+	if err != nil {
+		return nil
+	}
+
+	// Set and activate menu as starting scene
+	e.CurrentScene.Switch(e, "Main Menu")
+
 	e.LastFrame = time.Now()
+
+	return nil
 }
 
 func (e *Engine) ProcessAction(input_id byte, pressed byte, args []interface{}) error {
@@ -187,10 +371,14 @@ func (e *Engine) DrawText(font_name string, font_size int, lines []string, color
 	font, ok := sized_fonts[font_name]
 
 	if !ok {
-		return fmt.Errorf("failed to load font of name %s", font_name)
+		return fmt.Errorf("failed to load font with name %s", font_name)
 	}
 
 	for line_num, line := range lines {
+		if line == "" {
+			continue
+		}
+
 		line_width, line_height, err := e.GetTextSize(font, line)
 
 		if err != nil {
@@ -234,4 +422,105 @@ func (e *Engine) FreeFonts() {
 			font.Close()
 		}
 	}
+}
+
+func (e *Engine) CenterTextInRect(font_name string, font_size int, lines []string, rect sdl.Rect) (sdl.Point, error) {
+	sized_fonts, ok := e.Fonts[font_size]
+
+	if !ok {
+		return sdl.Point{}, fmt.Errorf("failed to load font of size %d", font_size)
+	}
+
+	font, ok := sized_fonts[font_name]
+
+	if !ok {
+		return sdl.Point{}, fmt.Errorf("failed to load font with name %s", font_name)
+	}
+
+	var line_width int
+	var line_height int
+	var err error
+
+	max_len := 0
+
+	for _, line := range lines {
+		line_width, line_height, err = e.GetTextSize(font, line)
+
+		if err != nil {
+			return sdl.Point{}, err
+		}
+
+		if line_width > max_len {
+			max_len = line_width
+		}
+	}
+
+	return sdl.Point{
+		X: rect.X + (rect.W-int32(max_len))/2,
+		Y: rect.Y + (rect.H-int32(len(lines)*line_height))/2,
+	}, nil
+}
+
+func (e *Engine) MoveMouse(pos sdl.Point) {
+	e.MousePos = pos
+	e.CurrentScene.Hover(e, pos)
+}
+
+func (e *Engine) InsertScene(scene Scene) error {
+	_, ok := e.Scenes[scene.GetTitle()]
+
+	if ok {
+		return fmt.Errorf("scene already exists: %s", scene.GetTitle())
+	}
+
+	e.Scenes[scene.GetTitle()] = scene
+	return nil
+}
+
+func (e *Engine) RenderScene() error {
+	err := e.Renderer.Clear()
+
+	if err != nil {
+		return err
+	}
+
+	if e.CurrentScene != nil {
+		err = e.CurrentScene.RenderWidgets(e)
+	} else {
+		return errors.New("engine has no current scene")
+	}
+
+	if err != nil {
+		return err
+	}
+
+	e.Renderer.Present()
+
+	return nil
+}
+
+func (e *Engine) ContainsScene(title string) bool {
+	_, ok := e.Scenes[title]
+
+	return ok
+}
+
+func (e *Engine) DeleteScene(title string) error {
+	if e.ContainsScene(title) {
+		delete(e.Scenes, title)
+	} else {
+		return fmt.Errorf("no scene exists with title: %s", title)
+	}
+
+	return nil
+}
+
+func (e *Engine) GetSceneTitles() []string {
+	titles := []string{}
+
+	for title := range e.Scenes {
+		titles = append(titles, title)
+	}
+
+	return titles
 }

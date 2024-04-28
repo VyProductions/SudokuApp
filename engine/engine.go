@@ -5,8 +5,6 @@ import (
 	"log"
 	"time"
 
-	"main/utility"
-
 	"github.com/veandco/go-sdl2/sdl"
 	"github.com/veandco/go-sdl2/ttf"
 )
@@ -15,7 +13,7 @@ type Engine struct {
 	Window         *sdl.Window
 	Renderer       *sdl.Renderer
 	Fonts          map[int]map[string]*ttf.Font
-	MousePos       utility.Vec2
+	MousePos       sdl.Point
 	InputTransform map[int]byte
 	KeyBinds       map[byte][2]func(engine *Engine, args []interface{})
 	FrameTime      float64

@@ -6,7 +6,6 @@ import (
 
 	"main/engine"
 	"main/selection"
-	"main/utility"
 
 	"github.com/veandco/go-sdl2/sdl"
 	"github.com/veandco/go-sdl2/ttf"
@@ -23,8 +22,8 @@ func main() {
 	}
 	defer ttf.Quit()
 
-	wind_width, wind_height := utility.Int32(800), utility.Int32(600)
-	window, err := sdl.CreateWindow("Sudoku", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED, wind_width.ToInt32(), wind_height.ToInt32(), sdl.WINDOW_SHOWN)
+	wind_width, wind_height := int32(800), int32(600)
+	window, err := sdl.CreateWindow("Sudoku", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED, wind_width, wind_height, sdl.WINDOW_SHOWN|sdl.WINDOW_BORDERLESS)
 	if err != nil {
 		log.Fatalf("Error creating window: %s\n", err)
 	}
@@ -37,10 +36,8 @@ func main() {
 	defer renderer.Destroy()
 
 	appEngine := &engine.Engine{
-		Window:    window,
-		Renderer:  renderer,
-		FrameTime: 0.0,
-		MousePos:  utility.Vec2{X: &wind_width, Y: &wind_height},
+		Window:   window,
+		Renderer: renderer,
 	}
 
 	appEngine.Setup()
@@ -52,11 +49,7 @@ func main() {
 			case *sdl.QuitEvent:
 				running = false
 			case *sdl.MouseMotionEvent:
-				x_scal, y_scal := utility.Int32(t.X), utility.Int32(t.Y)
-				appEngine.MousePos = utility.Vec2{
-					X: &x_scal,
-					Y: &y_scal,
-				}
+				appEngine.MousePos = sdl.Point{X: t.X, Y: t.Y}
 			case *sdl.MouseButtonEvent:
 				press_state, _ := selection.Ternary(event.GetType() == sdl.MOUSEBUTTONDOWN, engine.PRESSED, engine.RELEASED).(byte)
 				args := []interface{}{t.X, t.Y}
@@ -73,6 +66,7 @@ func main() {
 
 		if duration_us >= 16667 {
 			appEngine.LastFrame = time.Now()
+			appEngine.FrameTime = float64(duration_us) / 1e6
 
 			err = appEngine.Renderer.Clear()
 

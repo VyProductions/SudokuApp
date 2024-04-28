@@ -4,7 +4,6 @@ import "github.com/veandco/go-sdl2/sdl"
 
 type Scene interface {
 	Setup(*Engine, string, []interface{}) error
-	Switch(*Engine, string) error
 	Delete(*Engine) error
 	GetTitle() string
 

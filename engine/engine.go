@@ -259,8 +259,11 @@ func (e *Engine) Setup(wind *sdl.Window, rend *sdl.Renderer) error {
 		for col := 0; col < 9; col++ {
 			button := &Button{}
 
+			x_offs := int32(col)*(cellSize+10) + int32(col/3)*5
+			y_offs := int32(row)*(cellSize+10) + int32(row/3)*5
+
 			err = button.Setup(e, []interface{}{
-				sdl.Point{X: 10 + int32(col)*(cellSize+10), Y: 10 + int32(row)*(cellSize+10)},
+				sdl.Point{X: 10 + x_offs, Y: 10 + y_offs},
 				sdl.Point{X: cellSize, Y: cellSize},
 				sdl.Color{R: 0xAF, G: 0xAF, B: 0xAF, A: 0xFF},
 				"",
@@ -292,7 +295,7 @@ func (e *Engine) Setup(wind *sdl.Window, rend *sdl.Renderer) error {
 	back := &Button{}
 
 	err = back.Setup(e, []interface{}{
-		sdl.Point{X: 9*cellSize + 10*10, Y: 8*cellSize + 9*10},
+		sdl.Point{X: 9*cellSize + 11*10, Y: 8*cellSize + 10*10},
 		sdl.Point{X: 2*cellSize + 10, Y: cellSize},
 		sdl.Color{R: 0xDF, G: 0x10, B: 0x10, A: 0xFF},
 		"Back",

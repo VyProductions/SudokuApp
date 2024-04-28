@@ -5,8 +5,8 @@ import (
 )
 
 type Widget interface {
-	Setup(*Engine, []interface{}) error
-	Delete(*Engine) error
+	Setup(Scene, []interface{}) error
+	Delete(Scene) error
 	GetWidgetID() string
 
 	SetPosition(sdl.Point)
@@ -14,6 +14,7 @@ type Widget interface {
 
 	Draw(*Engine) error
 
+	ID() *string
 	Visible() *bool
 	Active() *bool
 

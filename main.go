@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"time"
 
@@ -23,7 +24,7 @@ func main() {
 	defer ttf.Quit()
 
 	wind_width, wind_height := int32(800), int32(600)
-	window, err := sdl.CreateWindow("Sudoku", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED, wind_width, wind_height, sdl.WINDOW_SHOWN|sdl.WINDOW_BORDERLESS)
+	window, err := sdl.CreateWindow("Sudoku", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED, wind_width, wind_height, sdl.WINDOW_SHOWN)
 	if err != nil {
 		log.Fatalf("Error creating window: %s\n", err)
 	}
@@ -118,7 +119,14 @@ func main() {
 					"Welcome to Sudoku.",
 				},
 				sdl.Color{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF},
-				sdl.Point{X: 100, Y: 50},
+				sdl.Point{X: 10, Y: 10},
+			)
+
+			appEngine.DrawText(
+				font_name, font_size,
+				[]string{fmt.Sprintf("Time since last frame (s): %f", appEngine.FrameTime)},
+				sdl.Color{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF},
+				sdl.Point{X: 10, Y: 566},
 			)
 
 			appEngine.Renderer.Present()

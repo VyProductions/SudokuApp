@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"time"
 
@@ -36,12 +35,13 @@ func main() {
 	}
 	defer renderer.Destroy()
 
-	appEngine := &engine.Engine{
-		Window:   window,
-		Renderer: renderer,
-	}
+	appEngine := &engine.Engine{}
 
-	appEngine.Setup()
+	err = appEngine.Setup(window, renderer)
+
+	if err != nil {
+		log.Fatalf("Error starting engine: %s\n", err)
+	}
 
 	running := true
 	for running {
@@ -50,7 +50,7 @@ func main() {
 			case *sdl.QuitEvent:
 				running = false
 			case *sdl.MouseMotionEvent:
-				appEngine.MousePos = sdl.Point{X: t.X, Y: t.Y}
+				appEngine.MoveMouse(sdl.Point{X: t.X, Y: t.Y})
 			case *sdl.MouseButtonEvent:
 				press_state, _ := selection.Ternary(event.GetType() == sdl.MOUSEBUTTONDOWN, engine.PRESSED, engine.RELEASED).(byte)
 				args := []interface{}{t.X, t.Y}
@@ -69,67 +69,12 @@ func main() {
 			appEngine.LastFrame = time.Now()
 			appEngine.FrameTime = float64(duration_us) / 1e6
 
-			err = appEngine.Renderer.Clear()
+			err = appEngine.RenderScene()
 
 			if err != nil {
-				log.Fatalf("Error clearing renderer: %s\n", err)
+				log.Fatalf("Error rendering scene: %s\n", err)
 			}
 
-			err = appEngine.DrawQuad(
-				[4]sdl.Vertex{
-					{
-						Position: sdl.FPoint{X: 200, Y: 100},
-						Color:    sdl.Color{R: uint8(0xFF), G: uint8(0x00), B: uint8(0x00), A: uint8(0xFF)},
-						TexCoord: sdl.FPoint{},
-					},
-					{
-						Position: sdl.FPoint{X: 200, Y: 500},
-						Color:    sdl.Color{R: uint8(0x00), G: uint8(0xFF), B: uint8(0x00), A: uint8(0xFF)},
-						TexCoord: sdl.FPoint{},
-					},
-					{
-						Position: sdl.FPoint{X: 600, Y: 100},
-						Color:    sdl.Color{R: uint8(0x00), G: uint8(0x00), B: uint8(0xFF), A: uint8(0xFF)},
-						TexCoord: sdl.FPoint{},
-					},
-					{
-						Position: sdl.FPoint{X: 600, Y: 500},
-						Color:    sdl.Color{R: uint8(0xFF), G: uint8(0xFF), B: uint8(0xFF), A: uint8(0xFF)},
-						TexCoord: sdl.FPoint{},
-					},
-				},
-				[6]int32{0, 1, 2, 1, 2, 3},
-			)
-
-			if err != nil {
-				log.Fatalf("Error drawing: %s\n", err)
-			}
-
-			font_name := "lotuscoder_normal"
-			font_size := 24
-
-			if err != nil {
-				log.Fatalf("Error drawing text: %s\n", err)
-			}
-
-			appEngine.DrawText(
-				font_name, font_size,
-				[]string{
-					"Hello, Traveler.",
-					"Welcome to Sudoku.",
-				},
-				sdl.Color{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF},
-				sdl.Point{X: 10, Y: 10},
-			)
-
-			appEngine.DrawText(
-				font_name, font_size,
-				[]string{fmt.Sprintf("Time since last frame (s): %f", appEngine.FrameTime)},
-				sdl.Color{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF},
-				sdl.Point{X: 10, Y: 566},
-			)
-
-			appEngine.Renderer.Present()
 		}
 	}
 

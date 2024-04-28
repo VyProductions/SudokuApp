@@ -81,12 +81,12 @@ func (l *Label) useArgs(args []interface{}) error {
 	return nil
 }
 
-func (l *Label) Setup(e *Engine, args []interface{}) error {
+func (l *Label) Setup(s Scene, args []interface{}) error {
 	*l = Label{}
 
 	num_labels := 0
 
-	for _, key := range e.CurrentScene.GetWidgetIDs() {
+	for _, key := range s.GetWidgetIDs() {
 		prefix := strings.Split(key, "_")[0]
 
 		if prefix == "Label" {
@@ -104,11 +104,11 @@ func (l *Label) Setup(e *Engine, args []interface{}) error {
 		return err
 	}
 
-	return e.CurrentScene.InsertWidget(l)
+	return s.InsertWidget(l)
 }
 
-func (l *Label) Delete(e *Engine) error {
-	return e.CurrentScene.DeleteWidget(l.WidgetID)
+func (l *Label) Delete(s Scene) error {
+	return s.DeleteWidget(l.WidgetID)
 }
 
 func (l *Label) GetWidgetID() string {
@@ -136,6 +136,10 @@ func (l *Label) Draw(e *Engine) error {
 	}
 
 	return e.DrawText(l.FontName, l.FontSize, l.Text, l.TextColor, centered_pos)
+}
+
+func (l *Label) ID() *string {
+	return &l.WidgetID
 }
 
 func (l *Label) Visible() *bool {

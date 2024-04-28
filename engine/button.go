@@ -103,12 +103,12 @@ func (b *Button) useArgs(args []interface{}) error {
 	return nil
 }
 
-func (b *Button) Setup(e *Engine, args []interface{}) error {
+func (b *Button) Setup(s Scene, args []interface{}) error {
 	*b = Button{}
 
 	num_buttons := 0
 
-	for _, key := range e.CurrentScene.GetWidgetIDs() {
+	for _, key := range s.GetWidgetIDs() {
 		prefix := strings.Split(key, "_")[0]
 
 		if prefix == "Button" {
@@ -130,11 +130,11 @@ func (b *Button) Setup(e *Engine, args []interface{}) error {
 	*b.Active() = true
 	b.isHovered = false
 
-	return e.CurrentScene.InsertWidget(b)
+	return s.InsertWidget(b)
 }
 
-func (b *Button) Delete(e *Engine) error {
-	return e.CurrentScene.DeleteWidget(b.WidgetID)
+func (b *Button) Delete(s Scene) error {
+	return s.DeleteWidget(b.WidgetID)
 }
 
 func (b *Button) GetWidgetID() string {
@@ -162,6 +162,10 @@ func (b *Button) Draw(e *Engine) error {
 	}
 
 	return e.DrawText(b.FontName, b.FontSize, []string{b.Text}, b.TextColor, centered_pos)
+}
+
+func (b *Button) ID() *string {
+	return &b.WidgetID
 }
 
 func (b *Button) Visible() *bool {
